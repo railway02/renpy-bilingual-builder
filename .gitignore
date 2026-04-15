@@ -1,0 +1,35 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# generated outputs
+output/*
+!output/.gitkeep
+unresolved/*
+!unresolved/.gitkeep
+
+# user-provided game data
+input/chinese_tl/*
+!input/chinese_tl/.gitkeep
+input/original_english/*
+!input/original_english/.gitkeep
+
+# game/runtime artifacts
+cache/
+saves/
+persistent
+*.save
+
+# archives / compiled renpy files
+*.rpa
+*.rpyc
+*.rpymc
+
+# large packaged content
+*.zip
+*.7z
+*.rar
