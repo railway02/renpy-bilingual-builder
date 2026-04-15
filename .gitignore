@@ -6,30 +6,31 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# generated outputs
+# build outputs
 output/*
 !output/.gitkeep
+
+# unresolved artifacts
 unresolved/*
 !unresolved/.gitkeep
 
-# user-provided game data
+# user-provided input
 input/chinese_tl/*
 !input/chinese_tl/.gitkeep
+
 input/original_english/*
 !input/original_english/.gitkeep
 
-# game/runtime artifacts
+# renpy/game data
+*.rpa
+*.rpyc
+*.rpymc
 cache/
 saves/
 persistent
 *.save
 
-# archives / compiled renpy files
-*.rpa
-*.rpyc
-*.rpymc
-
-# large packaged content
+# archives
 *.zip
 *.7z
 *.rar
