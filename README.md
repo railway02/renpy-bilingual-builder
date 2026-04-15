@@ -51,7 +51,7 @@ English line
 
 ## 当前组件
 
-### `tools/build_bilingual.py`
+### `tools/build_bilingualv1.py`
 原始的MVP构建器。
 主要特点：
 - 相邻行匹配
