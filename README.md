@@ -1,4 +1,5 @@
 # Ren'Py Bilingual Builder
+### Build readable and structured bilingual subtitle patches for Ren'Py games.
 
 为Ren'Py游戏构建可读性强、结构清晰的双语字幕补丁。
 
