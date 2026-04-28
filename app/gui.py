@@ -29,6 +29,12 @@ REPORT_FIELDS = (
     "fallback_english_from_original_statements",
     "missing_original_statements",
 )
+REPORT_FIELD_LABELS = {
+    "processed_statements": "已处理对白",
+    "unmatched_statements": "未匹配对白",
+    "fallback_english_from_original_statements": "英文兜底",
+    "missing_original_statements": "缺失原文",
+}
 
 
 class BilingualBuilderApp(ctk.CTk):
@@ -45,23 +51,22 @@ class BilingualBuilderApp(ctk.CTk):
         self.ui_queue: queue.Queue[tuple[str, object]] = queue.Queue()
         self.worker: threading.Thread | None = None
         self.last_report_path = REPORT_PATH
+        self.build_succeeded = False
 
         self._build_variables()
         self._build_layout()
         self.after(100, self._drain_ui_queue)
 
     def _build_variables(self) -> None:
-        self.chinese_tl_dir = ctk.StringVar(value=str(PROJECT_ROOT / "input" / "chinese_tl"))
-        self.original_english_dir = ctk.StringVar(
-            value=str(PROJECT_ROOT / "input" / "original_english")
-        )
-        self.output_dir = ctk.StringVar(value=str(PROJECT_ROOT / "output" / "tl" / "chinese"))
+        self.chinese_tl_dir = ctk.StringVar(value="input/chinese_tl")
+        self.original_english_dir = ctk.StringVar(value="input/original_english")
+        self.output_dir = ctk.StringVar(value="output/tl/chinese")
         self.game_dir = ctk.StringVar(value="")
         self.status_text = ctk.StringVar(value="状态：未开始")
 
     def _build_layout(self) -> None:
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(3, weight=1)
+        self.grid_rowconfigure(4, weight=1)
 
         header = ctk.CTkLabel(
             self,
@@ -70,47 +75,55 @@ class BilingualBuilderApp(ctk.CTk):
         )
         header.grid(row=0, column=0, padx=20, pady=(18, 8), sticky="w")
 
+        subtitle = ctk.CTkLabel(
+            self,
+            text="选择翻译目录和原始英文目录，一键生成并部署 Ren'Py 双语补丁。",
+            anchor="w",
+        )
+        subtitle.grid(row=1, column=0, padx=20, pady=(0, 8), sticky="w")
+
         path_frame = ctk.CTkFrame(self)
-        path_frame.grid(row=1, column=0, padx=20, pady=8, sticky="ew")
+        path_frame.grid(row=2, column=0, padx=20, pady=8, sticky="ew")
         path_frame.grid_columnconfigure(1, weight=1)
 
         self._add_path_row(
             path_frame,
             0,
-            "中文翻译目录 chinese_tl",
+            "中文翻译目录",
             self.chinese_tl_dir,
             lambda: self._choose_directory(self.chinese_tl_dir),
         )
         self._add_path_row(
             path_frame,
             1,
-            "原始英文目录 original_english",
+            "原始英文目录",
             self.original_english_dir,
             lambda: self._choose_directory(self.original_english_dir),
         )
         self._add_path_row(
             path_frame,
             2,
-            "输出目录 output/tl/chinese",
+            "输出目录",
             self.output_dir,
             lambda: self._choose_directory(self.output_dir),
         )
         self._add_path_row(
             path_frame,
             3,
-            "游戏 game 目录",
+            "游戏目录",
             self.game_dir,
-            lambda: self._choose_directory(self.game_dir),
+            self._choose_game_directory,
         )
 
         actions = ctk.CTkFrame(self)
-        actions.grid(row=2, column=0, padx=20, pady=8, sticky="ew")
+        actions.grid(row=3, column=0, padx=20, pady=8, sticky="ew")
 
         self.build_button = ctk.CTkButton(actions, text="开始构建", command=self.start_build)
         self.build_button.grid(row=0, column=0, padx=10, pady=12)
 
         self.deploy_button = ctk.CTkButton(actions, text="一键部署", command=self.start_deploy)
         self.deploy_button.grid(row=0, column=1, padx=10, pady=12)
+        self.deploy_button.configure(state="disabled")
 
         self.open_output_button = ctk.CTkButton(
             actions,
@@ -123,7 +136,7 @@ class BilingualBuilderApp(ctk.CTk):
         self.open_report_button.grid(row=0, column=3, padx=10, pady=12)
 
         body = ctk.CTkFrame(self)
-        body.grid(row=3, column=0, padx=20, pady=(8, 20), sticky="nsew")
+        body.grid(row=4, column=0, padx=20, pady=(8, 20), sticky="nsew")
         body.grid_columnconfigure(0, weight=1)
         body.grid_rowconfigure(2, weight=1)
 
@@ -171,6 +184,12 @@ class BilingualBuilderApp(ctk.CTk):
         if path:
             variable.set(path)
 
+    def _choose_game_directory(self) -> None:
+        path = filedialog.askdirectory()
+        if path:
+            game_dir = self._normalize_game_dir(Path(path))
+            self.game_dir.set(self._format_path_for_entry(game_dir))
+
     def start_build(self) -> None:
         if self._is_worker_running():
             messagebox.showinfo("正在运行", "当前已有任务在运行。")
@@ -180,10 +199,11 @@ class BilingualBuilderApp(ctk.CTk):
         if build_script is None:
             return
 
-        src_dir = self.chinese_tl_dir.get()
-        original_dir = self.original_english_dir.get()
-        dst_dir = self.output_dir.get()
+        src_dir = str(self._resolve_entry_path(self.chinese_tl_dir.get()))
+        original_dir = str(self._resolve_entry_path(self.original_english_dir.get()))
+        dst_dir = str(self._resolve_entry_path(self.output_dir.get()))
 
+        self.build_succeeded = False
         self._clear_log()
         self._set_status("构建中")
         self._set_buttons_enabled(False)
@@ -273,6 +293,7 @@ class BilingualBuilderApp(ctk.CTk):
             self._queue_log("-" * 72)
             self._queue_log(f"报告已生成：{report_path}")
             self._load_report_summary(report_path)
+            self._queue_build_succeeded(True)
         except Exception as exc:
             self._queue_status("构建异常")
             self._queue_log(f"[异常] {exc}")
@@ -313,12 +334,12 @@ class BilingualBuilderApp(ctk.CTk):
         return target_tl, target_patch, backup_tl
 
     def _validate_build_inputs(self) -> Path | None:
-        chinese_dir = Path(self.chinese_tl_dir.get()).expanduser()
-        original_dir = Path(self.original_english_dir.get()).expanduser()
+        chinese_dir = self._entry_directory(self.chinese_tl_dir.get(), "中文翻译目录")
+        original_dir = self._entry_directory(self.original_english_dir.get(), "原始英文目录")
 
-        if not self._require_directory(chinese_dir, "中文翻译目录 chinese_tl"):
+        if chinese_dir is None:
             return None
-        if not self._require_directory(original_dir, "原始英文目录 original_english"):
+        if original_dir is None:
             return None
 
         build_script = self._find_build_script()
@@ -331,7 +352,7 @@ class BilingualBuilderApp(ctk.CTk):
             messagebox.showerror("缺少 patch 文件", f"未找到：\n{PATCH_FILE}")
             return None
 
-        output_parent = Path(self.output_dir.get()).expanduser().parent
+        output_parent = self._resolve_entry_path(self.output_dir.get()).parent
         output_parent.mkdir(parents=True, exist_ok=True)
         self._warn_missing_dialogue_files((chinese_dir, original_dir))
 
@@ -344,13 +365,19 @@ class BilingualBuilderApp(ctk.CTk):
         return build_script.resolve()
 
     def _validate_deploy_inputs(self) -> tuple[Path, Path] | None:
-        output_dir = Path(self.output_dir.get()).expanduser()
-        game_dir = Path(self.game_dir.get()).expanduser()
+        output_dir = self._entry_directory(self.output_dir.get(), "输出目录")
+        selected_game_dir = self._entry_directory(self.game_dir.get(), "游戏目录")
 
-        if not self._require_directory(output_dir, "输出目录 output/tl/chinese"):
+        if output_dir is None:
             return None
-        if not self._require_directory(game_dir, "游戏 game 目录"):
+        if selected_game_dir is None:
             return None
+
+        game_dir = self._normalize_game_dir(selected_game_dir)
+        if not self._require_directory(game_dir, "游戏目录"):
+            return None
+
+        self.game_dir.set(self._format_path_for_entry(game_dir))
         if not PATCH_FILE.exists():
             messagebox.showerror("缺少 patch 文件", f"未找到：\n{PATCH_FILE}")
             return None
@@ -365,6 +392,34 @@ class BilingualBuilderApp(ctk.CTk):
 
         if warnings:
             messagebox.showwarning("文件提醒", "\n".join(warnings))
+
+    def _entry_directory(self, text: str, label: str) -> Path | None:
+        if not text.strip():
+            messagebox.showerror("路径为空", f"请选择{label}。")
+            return None
+
+        path = self._resolve_entry_path(text)
+        if not self._require_directory(path, label):
+            return None
+        return path
+
+    def _resolve_entry_path(self, text: str) -> Path:
+        path = Path(text.strip()).expanduser()
+        if not path.is_absolute():
+            path = PROJECT_ROOT / path
+        return path
+
+    def _normalize_game_dir(self, path: Path) -> Path:
+        game_child = path / "game"
+        if game_child.exists() and game_child.is_dir():
+            return game_child
+        return path
+
+    def _format_path_for_entry(self, path: Path) -> str:
+        try:
+            return str(path.resolve().relative_to(PROJECT_ROOT))
+        except ValueError:
+            return str(path)
 
     def _require_directory(self, path: Path, label: str) -> bool:
         if not path.exists() or not path.is_dir():
@@ -390,7 +445,7 @@ class BilingualBuilderApp(ctk.CTk):
             self._queue_log(f"读取报告失败：{exc}")
 
     def open_output_dir(self) -> None:
-        output_dir = Path(self.output_dir.get()).expanduser()
+        output_dir = self._resolve_entry_path(self.output_dir.get())
         if not output_dir.exists():
             messagebox.showwarning("路径不存在", f"输出目录不存在：\n{output_dir}")
             return
@@ -427,7 +482,9 @@ class BilingualBuilderApp(ctk.CTk):
         self.log_box.see("end")
 
     def _set_summary(self, values: dict[str, object]) -> None:
-        lines = [f"{field}: {values.get(field, '-')}" for field in REPORT_FIELDS]
+        lines = [
+            f"{REPORT_FIELD_LABELS[field]}: {values.get(field, '-')}" for field in REPORT_FIELDS
+        ]
         self.summary_box.configure(state="normal")
         self.summary_box.delete("1.0", "end")
         self.summary_box.insert("1.0", "\n".join(lines))
@@ -437,9 +494,9 @@ class BilingualBuilderApp(ctk.CTk):
         self.status_text.set(f"状态：{text}")
 
     def _set_buttons_enabled(self, enabled: bool) -> None:
-        state = "normal" if enabled else "disabled"
-        self.build_button.configure(state=state)
-        self.deploy_button.configure(state=state)
+        self.build_button.configure(state="normal" if enabled else "disabled")
+        deploy_enabled = enabled and self.build_succeeded
+        self.deploy_button.configure(state="normal" if deploy_enabled else "disabled")
 
     def _queue_log(self, text: str) -> None:
         self.ui_queue.put(("log", text))
@@ -449,6 +506,9 @@ class BilingualBuilderApp(ctk.CTk):
 
     def _queue_buttons(self, enabled: bool) -> None:
         self.ui_queue.put(("buttons", enabled))
+
+    def _queue_build_succeeded(self, succeeded: bool) -> None:
+        self.ui_queue.put(("build_succeeded", succeeded))
 
     def _queue_message(self, kind: str, title: str, body: str) -> None:
         self.ui_queue.put(("message", (kind, title, body)))
@@ -468,6 +528,8 @@ class BilingualBuilderApp(ctk.CTk):
                 self._set_summary(payload)  # type: ignore[arg-type]
             elif action == "buttons":
                 self._set_buttons_enabled(bool(payload))
+            elif action == "build_succeeded":
+                self.build_succeeded = bool(payload)
             elif action == "message":
                 kind, title, body = payload  # type: ignore[misc]
                 if kind == "error":
