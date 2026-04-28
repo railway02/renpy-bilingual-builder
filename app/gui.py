@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import threading
+from datetime import datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Callable, Iterable
@@ -204,6 +205,17 @@ class BilingualBuilderApp(ctk.CTk):
         if deploy_paths is None:
             return
 
+        _, game_dir = deploy_paths
+        target_tl = game_dir / "tl" / "chinese"
+        confirmed = messagebox.askyesno(
+            "确认部署",
+            f"一键部署将覆盖：\n{target_tl}\n\n"
+            "如果该目录已存在，会先自动备份为 chinese_backup_YYYYMMDD_HHMMSS。\n\n"
+            "是否继续？",
+        )
+        if not confirmed:
+            return
+
         self._set_status("部署中")
         self._set_buttons_enabled(False)
         self.worker = threading.Thread(target=self._run_deploy, args=deploy_paths, daemon=True)
@@ -270,8 +282,10 @@ class BilingualBuilderApp(ctk.CTk):
 
     def _run_deploy(self, output_dir: Path, game_dir: Path) -> None:
         try:
-            target_tl, target_patch = self._deploy_to_game(output_dir, game_dir)
+            target_tl, target_patch, backup_tl = self._deploy_to_game(output_dir, game_dir)
             self._queue_status("部署完成")
+            if backup_tl is not None:
+                self._queue_log(f"已备份原目录到：{backup_tl}")
             self._queue_log(f"已复制输出目录到：{target_tl}")
             self._queue_log(f"已复制 UI patch 到：{target_patch}")
             self._queue_message("info", "部署完成", "一键部署完成。")
@@ -282,16 +296,21 @@ class BilingualBuilderApp(ctk.CTk):
         finally:
             self._queue_buttons(True)
 
-    def _deploy_to_game(self, output_dir: Path, game_dir: Path) -> tuple[Path, Path]:
+    def _deploy_to_game(self, output_dir: Path, game_dir: Path) -> tuple[Path, Path, Path | None]:
         target_tl = game_dir / "tl" / "chinese"
         target_patch = game_dir / PATCH_FILE.name
+        backup_tl: Path | None = None
 
         target_tl.parent.mkdir(parents=True, exist_ok=True)
         if target_tl.exists():
-            shutil.rmtree(target_tl)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_tl = target_tl.with_name(f"chinese_backup_{timestamp}")
+            if backup_tl.exists():
+                raise FileExistsError(f"备份目录已存在：{backup_tl}")
+            shutil.move(str(target_tl), str(backup_tl))
         shutil.copytree(output_dir, target_tl)
         shutil.copy2(PATCH_FILE, target_patch)
-        return target_tl, target_patch
+        return target_tl, target_patch, backup_tl
 
     def _validate_build_inputs(self) -> Path | None:
         chinese_dir = Path(self.chinese_tl_dir.get()).expanduser()

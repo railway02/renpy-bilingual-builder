@@ -1,0 +1,10 @@
+Collecting customtkinter
+  Downloading customtkinter-5.2.2-py3-none-any.whl.metadata (677 bytes)
+Collecting darkdetect (from customtkinter)
+  Downloading darkdetect-0.8.0-py3-none-any.whl.metadata (3.6 kB)
+Requirement already satisfied: packaging in /home/railway/miniconda3/lib/python3.13/site-packages (from customtkinter) (25.0)
+Downloading customtkinter-5.2.2-py3-none-any.whl (296 kB)
+Downloading darkdetect-0.8.0-py3-none-any.whl (9.0 kB)
+Installing collected packages: darkdetect, customtkinter
+
+Successfully installed customtkinter-5.2.2 darkdetect-0.8.0
