@@ -34,3 +34,15 @@ persistent
 *.zip
 *.7z
 *.rar
+
+.vscode/
+
+input/*
+!input/.gitkeep
+output/*
+!output/.gitkeep
+unresolved/*
+!unresolved/.gitkeep
+
+.codex
+.=5.2.0
