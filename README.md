@@ -1,245 +1,496 @@
 # Ren'Py Bilingual Builder
-### Build readable and structured bilingual subtitle patches for Ren'Py games.
-### 演示视频
-[📺 点击此处在 Bilibili 观看演示视频](https://www.bilibili.com/video/BV1GVd5BTES3/)
 
-为Ren'Py游戏构建可读性强、结构清晰的双语字幕补丁。
+### A GUI-assisted tool for building readable bilingual subtitle patches for Ren'Py games.
 
-本项目提供一套实用的工具链，将标准Ren'Py翻译文件转换为更舒适的双语阅读体验。
+为 Ren'Py 游戏构建结构清晰、阅读舒适的双语字幕补丁。
 
-不同于脆弱的逐行替换或原始的两行堆叠，本项目专注于：
-- 基于对话块的重构
-- 稳定的双语布局
-- 英文为主/中文为辅的阅读层级
-- 更适合迭代优化的工程化工作流
+本项目最初以《Eternum / 永恒世界》作为验证案例，但工具本身并不只面向这一款游戏。  
+它主要适用于 **Ren'Py 游戏**，尤其是拥有标准 `.rpy` 翻译脚本结构的视觉小说项目。
 
+> 当前版本不是通用游戏字幕工具，也不支持所有游戏引擎。  
+> 其他 Ren'Py 游戏如果能准备原始英文 `.rpy` 和对应中文翻译 `.rpy`，理论上可以尝试适配。
 
-## 特性
+---
 
-### 基于对话块的处理
-对 `translate chinese xxx:` 段落采用块级解析，而非仅依赖相邻注释匹配。
+## Demo
 
-### 对话导向的工作流
-针对对话密集的脚本文件优化，例如：
-- `script.rpy`
-- `script2.rpy` 至 `script9.rpy`
-- `gallery_replay.rpy`
+演示视频：
 
-### 英中双语重构
-将支持的对话重写为：
+[📺 在 Bilibili 观看演示视频](https://www.bilibili.com/video/BV1GVd5BTES3/)
+
+示例效果：
+
 ```text
 English line
 中文行
 ```
-并结合专用UI补丁提升游戏内可读性。
 
-### 原始英文兜底
-当翻译文件不再包含可靠的英文原文行时，当前构建器可使用原始英文脚本文件作为兜底来源。
+建议在仓库中放入：
 
-### 诊断报告
-输出结构化的JSON报告，帮助检查：
-- 已处理的块
-- 已处理的语句
-- 未匹配的块/语句
-- 兜底使用情况
-- 缺失的原始英文来源
+```text
+samples/screenshots/before_english.png
+samples/screenshots/before_chinese.png
+samples/screenshots/after_bilingual.png
+```
 
-### 包含UI补丁
-附带专用的Ren'Py UI补丁，用于：
+然后可在这里补充截图：
+
+```markdown
+![English](samples/screenshots/before_english.png)
+![Chinese](samples/screenshots/before_chinese.png)
+![Bilingual](samples/screenshots/after_bilingual.png)
+```
+
+---
+
+## What is this?
+
+Ren'Py Bilingual Builder 是一个面向 Ren'Py 游戏的双语字幕构建工具链。
+
+它的目标不是简单把中英文粗暴堆成两行，而是尽量实现：
+
+- 基于 `translate chinese xxx:` 块的结构化处理
+- 英文主显示、中文辅助显示
+- 更稳定的文本框布局
+- 更适合实际游玩的双语阅读体验
+- 对普通用户更友好的 GUI 操作流程
+
+---
+
+## Key Features
+
+### GUI Preview
+
+当前项目已经包含实验性桌面 GUI。
+
+GUI 支持：
+
+- 选择中文翻译目录
+- 选择原始英文目录
+- 选择输出目录
+- 选择游戏目录
+- 一键构建双语文件
+- 查看构建日志
+- 查看构建摘要
+- 一键部署到 Ren'Py 游戏目录
+- 部署前自动备份原 `tl/chinese`
+
+---
+
+### Block-based Dialogue Reconstruction
+
+工具会按 Ren'Py 翻译块进行处理，而不是只依赖脆弱的逐行替换。
+
+主要处理类似：
+
+```renpy
+translate chinese example_id:
+    # mc "Hello."
+    mc "你好。"
+```
+
+并生成更适合双语显示的文本结构。
+
+---
+
+### Original English Fallback
+
+当中文翻译文件中缺少可靠英文原文时，工具可以尝试从原始英文 `.rpy` 脚本中补回英文。
+
+---
+
+### UI Patch
+
+项目包含一个 Ren'Py UI 补丁：
+
+```text
+patches/zz_bilingual_ui_patch.rpy
+```
+
+它用于改善游戏内双语显示体验，包括：
+
 - 固定文本框高度
-- 减少对话抖动
-- 更好的双语行层级
-- 提升长行可读性
-
-
-## 当前组件
-
-### `tools/build_bilingualv1.py`
-原始的MVP构建器。
-主要特点：
-- 相邻行匹配
-- 依赖英文注释+中文行配对
-- 可用作早期基线/回归参考
-
-### `tools/build_bilingual_v2.py`
-改进的基于块的构建器。
-主要特点：
-- 解析 `translate chinese xxx:` 块
-- 支持常见对话形式
-- 适用于常规对话重构
-- 目前推荐作为持续开发的基础
-
-### `tools/build_bilingual.py`
-当前的双源增强版本。
-主要特点：
-- 基于块的解析
-- 原始英文兜底
-- 更好的诊断功能
-- 适合作为当前主构建器
-
-### `patches/zz_bilingual_ui_patch.rpy`
-用于提升游戏内体验的UI补丁。
-负责：
-- 固定文本框高度
-- 更稳定的字幕位置
+- 减少字幕位置抖动
 - 英文为主行
 - 中文为辅行
-- 相比原始 `\n` 堆叠提升可读性
+- 提升长句阅读体验
 
+---
 
-## 支持的对话类型
-当前工作流主要聚焦于标准对话语句：
-- 角色对话：`mc "..."`、`e "..."` 等
-- 旁白行：`"..."`
-- `extend "..."`
-- `centered "..."`
+### Diagnostic Report
 
+构建完成后会生成 JSON 报告，用于检查：
 
-## 快速开始
+- 已处理对白数量
+- 未匹配对白数量
+- 原始英文兜底数量
+- 缺失原文数量
 
-### 1. 准备输入
-需要两个输入目录：
-- `input/chinese_tl/`：从目标Ren'Py游戏提取的已翻译.rpy文件
-- `input/original_english/`：同一游戏版本的原始英文.rpy文件
+---
 
-推荐的目标文件包括：
-`script.rpy`、`script2.rpy` 至 `script9.rpy`、`gallery_replay.rpy`
+## Supported Scope
 
-### 2. 运行构建器
-若当前主构建器是v3/双源版本，运行：
+当前主要支持：
+
+- Ren'Py `.rpy` 翻译脚本
+- `translate chinese xxx:` 块
+- 普通角色对白
+- 旁白
+- `extend`
+- `centered`
+
+常见支持形式：
+
+```renpy
+mc "Hello."
+"Some narration."
+extend "More text."
+centered "Chapter 1"
+```
+
+---
+
+## Not a Universal Game Subtitle Tool
+
+请注意：
+
+本项目目前主要面向 **Ren'Py 游戏**。
+
+它不是：
+
+- 所有英文游戏通用字幕工具
+- Unity / Unreal / RPG Maker 通用工具
+- 自动翻译器
+- 游戏资源提取器
+- 游戏本体分发工具
+
+如果其他游戏也是 Ren'Py，并且脚本结构接近，可以尝试适配。  
+但并不保证所有 Ren'Py 项目都能开箱即用。
+
+---
+
+## Quick Start: GUI
+
+### 1. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Run GUI
+
+```bash
+python app/gui.py
+```
+
+### 3. Select paths
+
+在 GUI 中选择：
+
+- 中文翻译目录
+- 原始英文目录
+- 输出目录
+- 游戏目录
+
+### 4. Build
+
+点击：
+
+```text
+开始构建
+```
+
+工具会生成双语输出文件。
+
+### 5. Deploy
+
+点击：
+
+```text
+一键部署
+```
+
+工具会将生成结果复制到 Ren'Py 游戏目录中，并复制 UI patch。
+
+部署时如果发现原有：
+
+```text
+game/tl/chinese
+```
+
+会先自动备份为：
+
+```text
+game/tl/chinese_backup_YYYYMMDD_HHMMSS
+```
+
+---
+
+## Quick Start: CLI
+
+如果你更喜欢命令行，也可以直接运行构建器：
+
 ```bash
 python tools/build_bilingual.py \
   --src input/chinese_tl \
   --src-original input/original_english \
   --dst output/tl/chinese \
-  --report-json output/reports/build_report_v25.json
+  --report-json output/reports/build_report_gui.json
 ```
-若增强版本仍使用其他文件名，请相应替换脚本路径。
 
-### 3. 部署输出
-生成的双语文件将写入：
-`output/tl/chinese/`
+生成结果会输出到：
 
-将其复制到游戏的：
-`game/tl/chinese/`
-
-### 4. 应用UI补丁
-将：
-`patches/zz_bilingual_ui_patch.rpy`
-
-复制到游戏的：
-`game/`
-
-### 5. 清除缓存并测试
-在游戏内测试前，必要时清除Ren'Py缓存，然后验证：
-- 常规对话
-- 旁白行
-- `extend`
-- `centered`
-- 长双语行
-- 整体文本框稳定性
-
-
-## 示例工作流
-1. 将已翻译的.rpy文件提取到 `input/chinese_tl/`
-2. 将原始英文.rpy文件提取到 `input/original_english/`
-3. 运行构建器
-4. 将生成的文件从 `output/tl/chinese/` 复制到游戏的 `game/tl/chinese/`
-5. 将 `patches/zz_bilingual_ui_patch.rpy` 复制到游戏的 `game/`
-6. 清除Ren'Py缓存
-7. 启动游戏并验证双语效果
-
-
-## 项目结构
+```text
+output/tl/chinese
 ```
+
+然后你可以手动复制到游戏目录：
+
+```text
+game/tl/chinese
+```
+
+并将 UI patch 复制到：
+
+```text
+game/zz_bilingual_ui_patch.rpy
+```
+
+---
+
+## Input Requirements
+
+你需要自行准备两个输入目录。
+
+### 1. Translated Chinese `.rpy` files
+
+```text
+input/chinese_tl/
+```
+
+这里放中文翻译 `.rpy` 文件。
+
+### 2. Original English `.rpy` files
+
+```text
+input/original_english/
+```
+
+这里放同版本原始英文 `.rpy` 文件。
+
+推荐目标文件包括：
+
+```text
+script.rpy
+script2.rpy
+script3.rpy
+script4.rpy
+script5.rpy
+script6.rpy
+script7.rpy
+script8.rpy
+script9.rpy
+gallery_replay.rpy
+```
+
+不同 Ren'Py 游戏的脚本文件名可能不同，后续版本会继续增强通用性。
+
+---
+
+## Project Structure
+
+```text
 renpy-bilingual-builder/
+├─ app/
+│  └─ gui.py
 ├─ tools/
 │  ├─ build_bilingual.py
-│  └─ legacy/
-│     ├─ build_bilingual_v1.py
-│     └─ build_bilingual_v2.py
+│  ├─ build_bilingual_v2.py
+│  └─ build_bilingualv1.py
 ├─ patches/
 │  └─ zz_bilingual_ui_patch.rpy
-├─ samples/
-│  ├─ input_demo/
-│  ├─ output_demo/
-│  └─ screenshots/
-├─ docs/
-│  └─ report_sample.json
 ├─ input/
 │  ├─ chinese_tl/
 │  └─ original_english/
 ├─ output/
+│  ├─ tl/
 │  └─ reports/
-├─ .gitignore
-└─ README.md
+├─ unresolved/
+├─ samples/
+│  └─ screenshots/
+├─ requirements.txt
+├─ README.md
+└─ .gitignore
 ```
-你可根据最终仓库的发布方式简化此结构。
 
+如果你的实际仓库结构和这里不同，请以仓库当前文件为准。
 
-## 输入要求
-本项目不为你提取或反编译游戏文件。
+---
 
-你必须自行准备：
-- 已翻译的Ren'Py .rpy文件
-- 原始英文Ren'Py .rpy文件
+## Current Components
 
-工具假设这些输入已以可提取/可用的形式存在。
+### `app/gui.py`
 
+实验性桌面 GUI。
 
-## 不包含的内容
-为避免重新分发受版权保护的内容，本仓库不包含：
-- 原始游戏文件
-- .rpa归档文件
-- .rpyc编译文件
-- 预制的商业翻译包
-- 来自受版权保护游戏的完整提取对话数据集
-- 字体、图片、音频或其他游戏资产
-- 存档文件、缓存文件或本地用户数据
+适合不想使用命令行的用户。
 
-用户必须自行提供合法的游戏文件和翻译资源。
+---
 
+### `tools/build_bilingual.py`
 
-## 限制
-### 聚焦范围
-本项目主要针对对话密集的文件优化，而非完整引擎UI覆盖。
+当前主构建器。
 
-### 语句覆盖
-当前解析器聚焦于常见对话语句类型。更复杂的自定义脚本结构可能仍需手动调整。
+主要功能：
 
-### 对齐缺口
-若存在以下情况，可能仍会有少量未匹配行：
+- 基于 Ren'Py 翻译块解析
+- 双源输入
+- 原始英文兜底
+- 生成双语 `.rpy`
+- 输出诊断报告
+
+---
+
+### `tools/build_bilingual_v2.py`
+
+早期块级解析版本。
+
+保留用于参考和回归测试。
+
+---
+
+### `tools/build_bilingualv1.py`
+
+最早的 MVP 版本。
+
+主要依赖“英文注释 + 下一行中文”的相邻行匹配。
+
+---
+
+### `patches/zz_bilingual_ui_patch.rpy`
+
+游戏内 UI 显示补丁。
+
+用于优化双语字幕显示效果。
+
+---
+
+## Example Workflow
+
+1. 准备目标 Ren'Py 游戏
+2. 提取或准备中文翻译 `.rpy`
+3. 提取或准备原始英文 `.rpy`
+4. 打开 GUI
+5. 选择输入和输出目录
+6. 点击构建
+7. 查看日志与摘要
+8. 一键部署到游戏目录
+9. 启动游戏测试双语效果
+
+---
+
+## What is NOT included
+
+为避免分发受版权保护内容，本仓库不包含：
+
+- 游戏本体
+- `.rpa` 归档文件
+- `.rpyc` 编译文件
+- 完整商业翻译包
+- 完整游戏脚本数据集
+- 字体文件
+- 图片资源
+- 音频资源
+- 存档文件
+- 缓存文件
+
+用户必须自行准备合法的游戏文件和翻译资源。
+
+---
+
+## Known Limitations
+
+### Ren'Py only
+
+当前主要面向 Ren'Py。  
+其他游戏引擎暂不支持。
+
+---
+
+### Not all Ren'Py games are guaranteed
+
+不同 Ren'Py 项目的脚本结构可能不同。  
+如果脚本结构差异较大，可能需要手动适配。
+
+---
+
+### Dialogue-focused
+
+当前主要优化普通对白文件。  
+系统 UI、角色名、菜单、复杂自定义逻辑暂不作为主处理目标。
+
+---
+
+### Text tag compatibility
+
+带复杂 Ren'Py 文本标签的句子可能需要保守处理。  
+后续版本会继续提升兼容性。
+
+---
+
+### Alignment gaps
+
+少量句子可能由于以下原因无法自动匹配：
+
 - 角色前缀不兼容
-- 源对齐不可靠
-- 翻译脚本缺乏足够的结构对应
+- 原文缺失
+- 翻译脚本结构变化
+- 自定义脚本格式特殊
 
-### UI/系统排除
-系统UI、名称及相关引擎敏感文件有意从主对话工作流中排除，以降低破坏游戏的风险。
+---
 
+## Roadmap
 
-## 项目存在的原因
-大多数临时的双语视觉小说补丁尝试通常存在以下一个或多个问题：
-- 原始行堆叠
-- 不稳定的文本框布局
-- 长行可读性差
-- 脆弱的匹配逻辑
-- 难以维护的一次性脚本
+- [ ] GUI polish
+- [ ] Windows executable release
+- [ ] Better game directory auto-detection
+- [ ] Safer Ren'Py text tag handling
+- [ ] Export unresolved blocks
+- [ ] LLM-assisted unresolved repair
+- [ ] Better match-rate report
+- [ ] More flexible target file detection
+- [ ] Broader Ren'Py project compatibility
 
-本项目试图在以下方面取得更好的平衡：
-- 可读性
-- 结构正确性
-- UI稳定性
-- 工程可维护性
+---
 
+## For Users
 
-## TODO
-- 完善边缘情况原始英文脚本的兜底逻辑
-- 导出未解决的块以用于LLM辅助修复
-- 添加结构化的基于JSON的合并流程
-- 改进诊断和匹配率报告
-- 扩展对更多Ren'Py语句类型的支持
-- 拓宽更多Ren'Py项目的兼容性
+如果你只是想使用双语补丁：
 
+1. 准备对应版本游戏
+2. 准备翻译文件
+3. 使用 GUI 构建和部署
+4. 启动游戏测试
 
-## 许可证
+本项目不提供游戏本体。
+
+---
+
+## For Developers
+
+欢迎提交 issue、PR 或适配其他 Ren'Py 项目的经验。
+
+适合贡献的方向：
+
+- GUI 改进
+- 兼容更多 Ren'Py 脚本结构
+- 更好的 text tag 处理
+- unresolved 自动修复流程
+- Windows 打包
+- 文档和示例补充
+
+---
+
+## License
+
 MIT
