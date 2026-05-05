@@ -16,7 +16,7 @@
 
 演示视频：
 
-[📺 在 Bilibili 观看演示视频](https://www.bilibili.com/video/BV1GVd5BTES3/)
+[📺 在 Bilibili 观看演示视频](https://www.bilibili.com/video/BV1bFREBqETU/)
 
 示例效果：
 
