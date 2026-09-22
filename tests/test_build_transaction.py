@@ -12,7 +12,7 @@ class BuildTransactionTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.src, self.original, self.dst = [self.root / name for name in ("src", "original", "dst")]
         for path in (self.src, self.original, self.dst):
             path.mkdir()

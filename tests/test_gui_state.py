@@ -52,7 +52,7 @@ class GuiStateTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
-        self.root = Path(temp.name)
+        self.root = Path(temp.name).resolve()
         self.output = self.root / "output"
         self.output.mkdir()
         self.report = self.root / "new_report.json"
