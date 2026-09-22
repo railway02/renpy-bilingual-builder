@@ -1,0 +1,55 @@
+name: Bug report / 问题反馈
+description: 启动、构建、部署或游戏内双语显示报错。
+title: '[Bug] '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请提供可复现步骤和最少量文本。无需上传完整游戏、汉化包或存档。
+        日志中的本机用户名、私人路径等内容可以替换为占位符。
+  - type: dropdown
+    id: stage
+    attributes:
+      label: 在哪一步出现问题？
+      options:
+        - 启动界面
+        - 构建双语
+        - 部署文件
+        - 游戏运行或双语显示
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 使用环境
+      description: 操作系统、Python 版本、工具的下载时间或提交号；游戏内问题请同时填写游戏、Ren'Py 和汉化版本。
+      placeholder: |
+        Windows 11 / Python 3.13
+        工具版本：...
+        游戏及汉化版本：...
+        Ren'Py 版本：...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤与预期结果
+      placeholder: |
+        1. 选择了哪些目录或运行了什么命令？
+        2. 点击了哪个操作，或游戏进行到哪句台词？
+        3. 实际发生了什么，预期应当怎样？
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: 错误文字或构建诊断
+      description: 粘贴启动窗口错误、traceback 的关键部分，或 JSON/CSV 报告中的相关条目。截图可以作为补充。
+      render: text
+  - type: textarea
+    id: sample
+    attributes:
+      label: 最小文本样例（可选）
+      description: 尽量改写为几行虚构对白，保留触发问题的标签、插值或语法；无需提交整章脚本。
+      render: text

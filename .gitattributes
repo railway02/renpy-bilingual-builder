@@ -1,0 +1,6 @@
+*.bat text eol=crlf
+*.sh text eol=lf
+*.py text eol=lf
+*.rpy text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
