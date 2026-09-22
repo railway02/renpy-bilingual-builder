@@ -1,27 +1,38 @@
+# Python and local environments
 __pycache__/
-*.pyc
-*.pyo
-*.log
-*.tmp
+*.py[cod]
+.venv/
+.venv.backup-*/
+.pytest_cache/
+.mypy_cache/
+build/
+dist/
+*.egg-info/
+
+# Editor, credentials, and local agent state
+.vscode/
+.idea/
+.codex
+.env
+.env.*
+!.env.example
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
 
-# build outputs
-output/*
-!output/.gitkeep
+# Generated outputs and user-owned game inputs
+/input/*
+!/input/.gitkeep
+/output/*
+!/output/.gitkeep
+/unresolved/*
+!/unresolved/.gitkeep
+/eternum_bilingual_project/
+/text/
+/translation/
+/zz_bilingual_ui_patch.rpy
 
-# unresolved artifacts
-unresolved/*
-!unresolved/.gitkeep
-
-# user-provided input
-input/chinese_tl/*
-!input/chinese_tl/.gitkeep
-
-input/original_english/*
-!input/original_english/.gitkeep
-
-# renpy/game data
+# Ren'Py archives, compiled scripts, saves, and local diagnostics
 *.rpa
 *.rpyc
 *.rpymc
@@ -29,20 +40,16 @@ cache/
 saves/
 persistent
 *.save
+traceback.txt
+errors.txt
+*.log
+*.tmp
+.rbb-build-*/
+.rbb-report-*/
+.rbb-deploy-*/
+renpy_bilingual_backups/
 
-# archives
+# Distribution archives
 *.zip
 *.7z
 *.rar
-
-.vscode/
-
-input/*
-!input/.gitkeep
-output/*
-!output/.gitkeep
-unresolved/*
-!unresolved/.gitkeep
-
-.codex
-.=5.2.0

@@ -1,0 +1,22 @@
+name: Feature request / 改进建议
+description: 描述希望改善的使用场景。
+title: '[Feature] '
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 当前遇到什么不便？
+      description: 请说明具体操作和使用场景。
+    validations:
+      required: true
+  - type: textarea
+    id: desired
+    attributes:
+      label: 希望怎样改进？
+      description: 可以附上简短的虚构输入、预期输出或界面描述。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 当前的解决方式（可选）
