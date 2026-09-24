@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 
 try:
     from app.gui import BilingualBuilderApp, REPORT_FIELDS
+    from app.runtime import RuntimePaths, resource_root
 except ImportError as exc:
     if (exc.name or "").split(".")[0] in {"tkinter", "_tkinter", "customtkinter"}:
         raise unittest.SkipTest("GUI tests require tkinter and customtkinter; build/deploy tests can run without them.") from exc
@@ -29,6 +30,7 @@ class EntryValue:
 class HeadlessApp(BilingualBuilderApp):
     def __init__(self, output):
         # No super(): these tests exercise coordination, not Tk rendering.
+        self.paths = RuntimePaths(resource_root(), output.parent / "user-data")
         self.output_dir = EntryValue(str(output))
         self.chinese_tl_dir = EntryValue(str(output.parent / "chinese"))
         self.original_english_dir = EntryValue(str(output.parent / "english"))
@@ -115,7 +117,7 @@ class GuiStateTests(unittest.TestCase):
     def test_empty_output_is_rejected_before_build_or_open(self):
         self.app.output_dir.set("   ")
         with patch("app.gui.messagebox.showerror") as error:
-            self.assertIsNone(self.app._validate_build_inputs())
+            self.assertFalse(self.app._validate_build_inputs())
             with patch.object(self.app, "_open_path") as open_path:
                 self.app.open_output_dir()
             open_path.assert_not_called()
@@ -142,15 +144,13 @@ class GuiStateTests(unittest.TestCase):
                     self.app._load_report_summary(self.report, self.output)
                 self.assertTrue(self.app.ui_queue.empty())
 
-    def test_successful_exit_without_report_does_not_validate_old_report(self):
+    def test_core_return_without_report_does_not_validate_old_report(self):
         old_report = self.app.last_report_path
         old_content = json.dumps(self.valid_report())
         old_report.write_text(old_content, encoding="utf-8")
         self.app.task_active = True
-        process = Mock(stdout=[])
-        process.wait.return_value = 0
-        with patch("app.gui.subprocess.Popen", return_value=process):
-            self.app._run_build(Path("build_bilingual.py"), "src", "english", str(self.output), self.report)
+        with self.assertLogs("rbb", level="ERROR"), patch("app.gui.build", return_value={}):
+            self.app._run_build("src", "english", str(self.output), self.report)
         with patch("app.gui.messagebox.showerror") as error:
             self.app._drain_ui_queue()
         error.assert_called_once()
@@ -161,22 +161,21 @@ class GuiStateTests(unittest.TestCase):
 
     def test_valid_build_binds_success_to_actual_output_and_report(self):
         self.report.write_text(json.dumps(self.valid_report()), encoding="utf-8")
-        process = Mock(stdout=[])
-        process.wait.return_value = 0
-        with patch("app.gui.subprocess.Popen", return_value=process) as popen:
-            self.app._run_build(Path("build_bilingual.py"), "src", "english", str(self.output), self.report)
+        with patch("app.gui.build") as core, patch("app.gui.subprocess.Popen") as popen:
+            self.app._run_build("src", "english", str(self.output), self.report)
+        popen.assert_not_called()
         self.app._drain_ui_queue()
         self.assertTrue(self.app._has_deployable_output())
         self.assertEqual(self.app.built_output_dir, self.output.resolve())
         self.assertEqual(self.app.last_report_path, self.report)
-        self.assertIn("--report-csv", popen.call_args.args[0])
-        self.assertEqual(popen.call_args.args[0][1:3], ["-X", "utf8"])
+        self.assertEqual(core.call_args.kwargs["csv_path"], self.report.with_suffix(".csv"))
+        self.assertEqual(core.call_args.kwargs["progress"], self.app._queue_log)
         self.app.deploy_button.configure.assert_called_with(state="normal")
 
     def test_each_attempt_gets_unique_report_and_preserves_last_success(self):
         old_report = self.app.last_report_path
         report_paths = []
-        with patch.object(self.app, "_validate_build_inputs", return_value=Path("build_bilingual.py")):
+        with patch.object(self.app, "_validate_build_inputs", return_value=True):
             with patch("app.gui.threading.Thread") as thread:
                 thread.return_value.is_alive.return_value = False
                 for _ in range(2):
@@ -185,6 +184,44 @@ class GuiStateTests(unittest.TestCase):
                     self.app.task_active = False
         self.assertNotEqual(*report_paths)
         self.assertEqual(self.app.last_report_path, old_report)
+
+    def test_core_exception_finishes_task_without_enabling_deployment(self):
+        self.app.task_active = True
+        with self.assertLogs("rbb", level="ERROR") as logs, patch("app.gui.build", side_effect=PermissionError("output is locked")):
+            self.app._run_build("src", "", str(self.output), self.report)
+        with patch("app.gui.messagebox.showerror") as error:
+            self.app._drain_ui_queue()
+        self.assertIn("关闭游戏", error.call_args.args[1])
+        self.assertIn("output is locked", "\n".join(logs.output))
+        self.assertFalse(self.app.task_active)
+        self.assertFalse(self.app.build_succeeded)
+        self.app.deploy_button.configure.assert_called_with(state="disabled")
+
+    def test_close_waits_for_worker_and_pending_ui_events(self):
+        with patch.object(self.app, "destroy") as destroy, patch("app.gui.messagebox.showinfo"):
+            self.app.task_active = True
+            self.app._on_close()
+            destroy.assert_not_called()
+            self.app.task_active = False
+            self.app._on_close()
+            destroy.assert_called_once()
+
+    def test_zero_matching_lines_exposes_failed_report_without_enabling_install(self):
+        source = self.root / "chinese"
+        source.mkdir()
+        (source / "unknown.rpy").write_text('translate chinese unknown:\n    "未知原文"\n', encoding="utf-8")
+        self.app.original_english_dir.set("")
+        self.app.task_active = True
+        with self.assertLogs("rbb", level="ERROR"):
+            self.app._run_build(str(source), "", str(self.output), self.report, language="chinese")
+        with patch("app.gui.messagebox.showerror"):
+            self.app._drain_ui_queue()
+        data = json.loads(self.app.last_report_path.read_text(encoding="utf-8"))
+        self.assertEqual(data["status"], "failed")
+        self.assertEqual(data["unmatched_statements"], 1)
+        self.assertTrue(self.app.report_is_current)
+        self.assertFalse(self.app.build_succeeded)
+        self.app.deploy_button.configure.assert_called_with(state="disabled")
 
     def test_report_logs_location_and_reason_with_bounded_preview(self):
         diagnostics = [dict(file="script8.rpy", line=47155 + i, reason="no_reliable_english") for i in range(25)]

@@ -1,5 +1,7 @@
 *.bat text eol=crlf
 *.sh text eol=lf
 *.rpy text eol=lf
+*.rpym text eol=lf
+*.bin binary
 *.md text eol=lf
 *.yml text eol=lf

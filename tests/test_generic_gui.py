@@ -8,7 +8,8 @@ import unittest
 from unittest.mock import Mock, patch
 
 try:
-    from app.gui import BilingualBuilderApp, ETERNUM_PROFILE, GENERIC_PROFILE, PATCH_FILE, PROJECT_ROOT, REPORT_FIELDS
+    from app.gui import BilingualBuilderApp, ETERNUM_PROFILE, GENERIC_PROFILE, PATCH_FILE, RESOURCE_ROOT, REPORT_FIELDS
+    from app.runtime import RuntimePaths
 except ImportError as exc:
     if (exc.name or "").split(".")[0] in {"tkinter", "_tkinter", "customtkinter"}:
         raise unittest.SkipTest("GUI tests require tkinter and customtkinter.") from exc
@@ -28,6 +29,7 @@ class Value:
 
 class HeadlessGenericApp(BilingualBuilderApp):
     def __init__(self, root):
+        self.paths = RuntimePaths(RESOURCE_ROOT, root / "user-data")
         self.chinese_tl_dir = Value(str(root / "translation"))
         self.original_english_dir = Value("")
         self.output_dir = Value(str(root / "output"))
@@ -73,25 +75,53 @@ class GenericGuiTests(unittest.TestCase):
         self.assertEqual(self.app._refresh_languages(), ["spanish"])
         self.assertEqual(self.app.language.get(), "spanish")
         with patch("app.gui.messagebox.showerror") as error, patch("app.gui.messagebox.showwarning") as warning:
-            self.assertIsNotNone(self.app._validate_build_inputs())
+            self.assertTrue(self.app._validate_build_inputs())
         error.assert_not_called()
         warning.assert_not_called()
+
+    def test_sample_uses_resource_paths_and_separate_user_output(self):
+        self.app.load_sample()
+        self.assertEqual(Path(self.app.chinese_tl_dir.get()), RESOURCE_ROOT / "samples/demo/chinese")
+        self.assertEqual(Path(self.app.original_english_dir.get()), RESOURCE_ROOT / "samples/demo/original")
+        self.assertEqual(Path(self.app.output_dir.get()), self.app.paths.output / "demo/tl/chinese")
+        self.assertTrue(self.app._validate_build_inputs())
+        self.assertTrue(self.app._is_demo_source())
+
+    def test_relative_paths_resolve_against_user_data(self):
+        self.assertEqual(self.app._resolve_entry_path("relative/output"), self.app.paths.data / "relative/output")
+        self.app.output_dir.set(str(RESOURCE_ROOT / "accidental-output"))
+        with patch("app.gui.messagebox.showerror") as error:
+            self.assertFalse(self.app._validate_build_inputs())
+        self.assertIn("程序资源", error.call_args.args[1])
+
+    def test_source_mode_output_cannot_replace_selected_game(self):
+        self.app.output_dir.set(self.app.game_dir.get())
+        with patch("app.gui.messagebox.showerror") as error:
+            self.assertFalse(self.app._validate_build_inputs())
+        self.assertIn("输出不能覆盖游戏", error.call_args.args[1])
+
+    def test_source_mode_cannot_relocate_module_with_unknown_game_relative_path(self):
+        self.mark_built()
+        (self.output / "optional.rpym").write_text('translate spanish module:\n    "Hello\\nHola"\n', encoding="utf-8")
+        with patch("app.gui.messagebox.showerror") as error:
+            self.assertIsNone(self.app._validate_deploy_inputs())
+        self.assertIn("加载路径", error.call_args.args[1])
 
     def test_multiple_languages_require_selection(self):
         (self.source / "japanese.rpy").write_text('translate japanese hello:\n    "Hello"\n')
         self.assertEqual(self.app._refresh_languages(), ["japanese", "spanish"])
         self.assertEqual(self.app.language.get(), "")
         with patch("app.gui.messagebox.showerror") as error:
-            self.assertIsNone(self.app._validate_build_inputs())
+            self.assertFalse(self.app._validate_build_inputs())
         error.assert_called_once()
         self.app.language.set("spanish")
-        self.assertIsNotNone(self.app._validate_build_inputs())
+        self.assertTrue(self.app._validate_build_inputs())
 
     def test_profile_does_not_allow_eternum_ui_for_other_languages(self):
         self.app.language.set("spanish")
         self.app.profile.set(ETERNUM_PROFILE)
         with patch("app.gui.messagebox.showerror") as error:
-            self.assertIsNone(self.app._validate_build_inputs())
+            self.assertFalse(self.app._validate_build_inputs())
         self.assertIn("仅适用于 chinese", error.call_args.args[1])
 
     def test_input_language_and_profile_changes_invalidate_success(self):
@@ -131,11 +161,10 @@ class GenericGuiTests(unittest.TestCase):
         self.assertTrue(self.app.ui_queue.empty())
 
     def test_real_generic_build_without_original_then_deployment(self):
-        script = self.app._validate_build_inputs()
-        self.assertIsNotNone(script)
+        self.assertTrue(self.app._validate_build_inputs())
         settings = self.app._current_settings()
         report = self.root / "report.json"
-        self.app._run_build(script, str(self.source), "", str(self.output), report,
+        self.app._run_build(str(self.source), "", str(self.output), report,
                             language="spanish", settings=settings)
         with patch("app.gui.messagebox.showerror") as error:
             self.app._drain_ui_queue()
@@ -157,7 +186,7 @@ class GenericGuiTests(unittest.TestCase):
         self.assertEqual(thread.call_args.kwargs["args"], (self.output, self.root / "game", "spanish", None))
 
     def test_demo_build_succeeds_but_cannot_enable_or_start_game_installation(self):
-        self.app.chinese_tl_dir.set(str(PROJECT_ROOT / "samples/demo/chinese"))
+        self.app.chinese_tl_dir.set(str(RESOURCE_ROOT / "samples/demo/chinese"))
         self.app.language.set("chinese")
         settings = self.app._current_settings()
         self.app._queue_build_succeeded(self.output, self.root / "demo_report.json", settings)

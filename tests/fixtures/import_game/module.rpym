@@ -1,0 +1,5 @@
+label optional_scene:
+    guide "An optional module line." id module_line
+    return
+translate chinese module_line:
+    guide "可选模块中的一句话。"

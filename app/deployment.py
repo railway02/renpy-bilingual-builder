@@ -17,7 +17,9 @@ def _check_destination(path: Path, *, directory: bool):
 
 
 def _has_source(output_dir: Path):
-    for source in output_dir.rglob("*.rpy"):
+    for source in output_dir.rglob("*"):
+        if source.suffix not in (".rpy", ".rpym"):
+            continue
         if source.is_file():
             with source.open("rb") as stream:
                 if any(line.strip() for line in stream):
@@ -71,7 +73,7 @@ def deploy_to_game(output_dir: Path, game_dir: Path, patch_file: Path | None = N
     elif patch_file.name == OWNED_UI_PATCH and language != "chinese":
         raise ValueError("永恒世界 UI 补丁只适用于 chinese 翻译，请改用通用模式。")
     if not _has_source(output_dir):
-        raise ValueError("双语输出目录中没有非空的 .rpy 源文件，请先完成构建。")
+        raise ValueError("双语输出目录中没有非空的 .rpy/.rpym 源文件，请先完成构建。")
 
     target_tl = game_dir / "tl" / language
     target_patch = game_dir / patch_file.name if patch_file is not None else None
@@ -97,7 +99,7 @@ def deploy_to_game(output_dir: Path, game_dir: Path, patch_file: Path | None = N
         stage = Path(temp)
         def ignore_compiled(directory, names):
             return [name for name in names if name.endswith(":Zone.Identifier") or
-                    (name.endswith(".rpyc") and name[:-1] in names)]
+                    (name.endswith((".rpyc", ".rpymc")) and name[:-1] in names)]
         shutil.copytree(output_dir, stage / language, ignore=ignore_compiled)
         if patch_file is not None:
             shutil.copy2(patch_file, stage / patch_file.name)

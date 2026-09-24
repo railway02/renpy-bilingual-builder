@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+.venv-build/
 .venv.backup-*/
 .pytest_cache/
 .mypy_cache/

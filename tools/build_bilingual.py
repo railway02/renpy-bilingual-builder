@@ -528,7 +528,8 @@ def process_block(
 
 
 def collect_rpy_files(root: Path) -> List[Path]:
-    return sorted(path for path in root.rglob("*.rpy") if path.is_file())
+    # Modules must keep .rpym: renaming them to .rpy changes when Ren'Py loads them.
+    return sorted(path for path in root.rglob("*") if path.is_file() and path.suffix in (".rpy", ".rpym"))
 
 
 def write_text(path: Path, content: str) -> None:
@@ -542,6 +543,8 @@ def process_target_file(
     dst_file: Path,
     rel_file: str,
     language: str = "chinese",
+    original_index: Optional[dict] = None,
+    allow_line_fallback: bool = True,
 ) -> FileStats:
     source_lines = src_file.read_text(encoding="utf-8-sig").splitlines(keepends=True)
     block_spans = extract_block_spans(source_lines, rel_file, language)
@@ -572,14 +575,21 @@ def process_target_file(
             original_block_missing = True
 
             rewritten_block, block_stats = process_block(block_lines, [], True)
-            if original_lines and block_stats.unmatched_statements:
+            if block_stats.unmatched_statements and original_index is not None and block.block_id in original_index:
+                reliable = original_index[block.block_id]
+                rewritten_block, block_stats = process_block(block_lines, reliable or [], reliable is None)
+                if reliable is None:
+                    for diagnostic in block_stats.diagnostics:
+                        if diagnostic["reason"] == "no_reliable_english":
+                            diagnostic["reason"] = "ambiguous_original_id"
+            elif original_lines and block_stats.unmatched_statements:
                 (
                     original_block_statements,
                     original_block_missing,
                 ) = select_original_statements_for_block(
                     block=block,
                     original_block_by_id=original_block_by_id,
-                    original_all_statements=original_all_statements,
+                    original_all_statements=original_all_statements if allow_line_fallback else [],
                 )
 
                 rewritten_block, block_stats = process_block(
@@ -623,6 +633,13 @@ def process_target_file(
 
 class BuildRecoveryError(RuntimeError):
     """Keep the transaction directory when recovery itself needs intervention."""
+
+
+class NoReliableDialogueError(ValueError):
+    def __init__(self, summary):
+        super().__init__("没有生成任何可靠的双语对白，未发布输出。请选择对应版本的游戏获取原文，或提供带原文注释的汉化脚本。")
+        self.summary = summary
+        self.report_path = None
 
 
 def _commit_build(work: Path, dst: Path, reports: Dict[Path, str]) -> None:
@@ -704,6 +721,8 @@ def build(
     report_path: Optional[Path] = None,
     csv_path: Optional[Path] = None, progress: Optional[Callable[[str], None]] = None,
     language: Optional[str] = None,
+    original_index: Optional[dict] = None, allow_line_fallback: bool = True,
+    input_manifest: Optional[dict] = None, require_changes: bool = False,
 ) -> dict:
     if dst is None:
         raise ValueError("An output directory is required.")
@@ -746,7 +765,7 @@ def build(
         languages = discover_languages(src)
         if not languages:
             raise ValueError(
-                "No translation language found in .rpy files; choose the translation directory "
+                "No translation language found in .rpy/.rpym files; choose the translation directory "
                 "containing translate <language> blocks, not the original game scripts."
             )
         if len(languages) > 1:
@@ -778,6 +797,7 @@ def build(
                 dst_file=work / "new" / rel,
                 rel_file=rel_str,
                 language=language,
+                original_index=original_index, allow_line_fallback=allow_line_fallback,
             )
             all_file_stats.append(stats)
 
@@ -787,6 +807,11 @@ def build(
                 "directory, not the original game scripts. Strings, python and style blocks are preserved."
             )
         summary = summarize_build(src, src_original, dst, all_file_stats, language)
+        if input_manifest is not None:
+            summary["input_manifest"] = input_manifest
+        summary["needs_review"] = bool(summary["unmatched_statements"] or summary["skipped_unsupported_blocks"])
+        if require_changes and not (summary["processed_statements"] or summary["skipped_already_bilingual"]):
+            raise NoReliableDialogueError(summary)
         if csv_path is not None:
             summary["diagnostics_csv"] = str(csv_path)
         reports = {}
@@ -839,14 +864,14 @@ def summarize_build(
 def ignore_generated_files(directory: str, names: List[str]) -> List[str]:
     # Keep compiled-only modules, but let Ren'Py compile every supplied source.
     return [name for name in names if name.endswith(":Zone.Identifier") or
-            (name.endswith(".rpyc") and name[:-1] in names)]
+            (name.endswith((".rpyc", ".rpymc")) and name[:-1] in names)]
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Build bilingual Ren'Py dialogue with conservative matching and recoverable output replacement."
     )
-    parser.add_argument("--src", required=True, help="One game's translation language directory containing .rpy files")
+    parser.add_argument("--src", required=True, help="One game's translation language directory containing .rpy/.rpym files")
     parser.add_argument(
         "--src-original",
         help="Optional original script directory for conservative fallback when source comments are missing",
