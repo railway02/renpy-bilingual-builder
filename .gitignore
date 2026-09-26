@@ -22,12 +22,9 @@ Thumbs.db
 *:Zone.Identifier
 
 # Generated outputs and user-owned game inputs
-/input/*
-!/input/.gitkeep
-/output/*
-!/output/.gitkeep
-/unresolved/*
-!/unresolved/.gitkeep
+/input/
+/output/
+/unresolved/
 /eternum_bilingual_project/
 /text/
 /translation/
